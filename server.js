@@ -18,13 +18,16 @@ const uploadRoutes = require('./routes/upload');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy (needed for Railway)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
 
-// Rate limiting - 100 requests per 15 minutes per IP
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -42,7 +45,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Static files
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -72,7 +75,6 @@ app.use((err, req, res, next) => {
 // Seed default data
 async function seedData() {
   try {
-    // Create default admin
     const adminCount = await User.count({ where: { role: 'admin' } });
     if (adminCount === 0) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -85,7 +87,6 @@ async function seedData() {
       console.log('✅ Default admin created: admin / admin123');
     }
 
-    // Create default school
     const school = await School.findByPk(1);
     if (!school) {
       await School.create({ id: 1 });
@@ -102,13 +103,12 @@ async function startServer() {
     await sequelize.authenticate();
     console.log('✅ PostgreSQL connected successfully.');
 
-    // Sync models (create tables if not exist)
     await sequelize.sync({ alter: true });
     console.log('✅ Database synchronized.');
 
     await seedData();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📱 Open: http://localhost:${PORT}`);
     });
